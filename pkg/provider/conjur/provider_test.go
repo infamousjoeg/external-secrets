@@ -116,10 +116,10 @@ func makeSecretStore(svcURL, svcUser, svcApikey, svcAccount string) *esv1beta1.S
 		Spec: esv1beta1.SecretStoreSpec{
 			Provider: &esv1beta1.SecretStoreProvider{
 				Conjur: &esv1beta1.ConjurProvider{
-					ServiceURL:     &svcURL,
-					ServiceUser:    &svcUser,
-					ServiceAPIKey:  &svcApikey,
-					ServiceAccount: &svcAccount,
+					ServiceURL:     svcURL,
+					ServiceUser:    svcUser,
+					ServiceAPIKey:  svcApikey,
+					ServiceAccount: svcAccount,
 				},
 			},
 		},

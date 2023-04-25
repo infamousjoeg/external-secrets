@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
 	"github.com/cyberark/conjur-api-go/conjurapi/authn"
@@ -49,14 +50,14 @@ func (p *Provider) NewClient(ctx context.Context, store esv1beta1.GenericStore, 
 		return nil, err
 	}
 	config := conjurapi.Config{
-		Account:      *cfg.ServiceAccount,
-		ApplianceURL: *cfg.ServiceURL,
-		SSLCert:      *cfg.ServiceCertificate,
+		Account:      cfg.ServiceAccount,
+		ApplianceURL: cfg.ServiceURL,
+		SSLCert:      cfg.ServiceCertificate,
 	}
 	conjur, err := conjurapi.NewClientFromKey(config,
 		authn.LoginPair{
-			Login:  *cfg.ServiceUser,
-			APIKey: *cfg.ServiceAPIKey,
+			Login:  cfg.ServiceUser,
+			APIKey: cfg.ServiceAPIKey,
 		},
 	)
 
@@ -103,11 +104,26 @@ func (p *Provider) GetSecretMap(ctx context.Context, ref esv1beta1.ExternalSecre
 		return nil, fmt.Errorf("error getting secret %s: %w", ref.Key, err)
 	}
 
-	// Maps the json data to a string:string map
-	kv := make(map[string]string)
-	err = json.Unmarshal(data, &kv)
+	// Unmarshal JSON data into a map[string]interface{}
+	var unmarshaledData map[string]interface{}
+	err = json.Unmarshal(data, &unmarshaledData)
 	if err != nil {
 		return nil, fmt.Errorf("unable to unmarshal secret %s: %w", ref.Key, err)
+	}
+
+	// Convert the values to strings and store them in a map[string]string
+	kv := make(map[string]string)
+	for key, value := range unmarshaledData {
+		switch v := value.(type) {
+		case string:
+			kv[key] = v
+		case float64: // JSON numbers are unmarshaled into float64
+			kv[key] = strconv.FormatFloat(v, 'f', -1, 64)
+		case bool:
+			kv[key] = strconv.FormatBool(v)
+		default:
+			fmt.Printf("Unsupported type for key %s\n", key)
+		}
 	}
 
 	// Converts values in K:V pairs into bytes, while leaving keys as strings
@@ -133,19 +149,19 @@ func (p *Provider) ValidateStore(store esv1beta1.GenericStore) error {
 	storeSpec := store.GetSpec()
 	conjurSpec := storeSpec.Provider.Conjur
 
-	if *conjurSpec.ServiceURL == "" {
+	if conjurSpec.ServiceURL == "" {
 		return fmt.Errorf("ServiceURL cannot be empty")
 	}
 
-	if *conjurSpec.ServiceUser == "" {
+	if conjurSpec.ServiceUser == "" {
 		return fmt.Errorf("ServiceUser cannot be empty")
 	}
 
-	if *conjurSpec.ServiceAPIKey == "" {
+	if conjurSpec.ServiceAPIKey == "" {
 		return fmt.Errorf("ServiceAPIKey cannot be empty")
 	}
 
-	if *conjurSpec.ServiceAccount == "" {
+	if conjurSpec.ServiceAccount == "" {
 		return fmt.Errorf("ServiceAccount cannot be empty")
 	}
 
